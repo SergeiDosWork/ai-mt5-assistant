@@ -295,6 +295,88 @@ def build_training_dataset(parquet_path: str) -> Tuple[np.ndarray, np.ndarray]:
     return X_array, y_array
 
 
+def prepare_inference_features(m3_data: list, h1_data: list) -> np.ndarray:
+    """
+    Prepares features for inference from M3 and H1 data received from MT5
+    
+    Args:
+        m3_data: List of 60 M3 candles
+        h1_data: List of 10 H1 candles
+        
+    Returns:
+        Features array ready for model inference
+    """
+    # Convert the incoming data to the format expected by the model
+    # This is a simplified implementation - in a real scenario you'd do proper feature engineering
+    
+    # Create a combined feature vector from the M3 and H1 data
+    # The exact implementation depends on how your model was trained
+    
+    # For now, we'll create a simple feature vector based on the OHLCV values
+    features = []
+    
+    # Process M3 data (60 candles)
+    for candle in m3_data:
+        if isinstance(candle, dict):
+            # If candle is a dictionary with named fields
+            open_price = candle.get('open', candle.get(0, 0))
+            high_price = candle.get('high', candle.get(1, 0))
+            low_price = candle.get('low', candle.get(2, 0))
+            close_price = candle.get('close', candle.get(3, 0))
+            volume = candle.get('volume', candle.get(4, 0))
+        else:
+            # If candle is a list/array
+            open_price = candle[0] if len(candle) > 0 else 0
+            high_price = candle[1] if len(candle) > 1 else 0
+            low_price = candle[2] if len(candle) > 2 else 0
+            close_price = candle[3] if len(candle) > 3 else 0
+            volume = candle[4] if len(candle) > 4 else 0
+            
+        # Normalize prices relative to the first candle's close
+        first_close = m3_data[0].get('close', m3_data[0][3]) if isinstance(m3_data[0], dict) else m3_data[0][3]
+        norm_factor = first_close if first_close != 0 else 1
+        
+        features.extend([
+            open_price / norm_factor - 1,  # Normalized open
+            high_price / norm_factor - 1,  # Normalized high
+            low_price / norm_factor - 1,   # Normalized low
+            close_price / norm_factor - 1, # Normalized close
+            volume  # Volume (not normalized)
+        ])
+    
+    # Process H1 data (10 candles) - similar approach
+    for candle in h1_data:
+        if isinstance(candle, dict):
+            open_price = candle.get('open', candle.get(0, 0))
+            high_price = candle.get('high', candle.get(1, 0))
+            low_price = candle.get('low', candle.get(2, 0))
+            close_price = candle.get('close', candle.get(3, 0))
+            volume = candle.get('volume', candle.get(4, 0))
+        else:
+            open_price = candle[0] if len(candle) > 0 else 0
+            high_price = candle[1] if len(candle) > 1 else 0
+            low_price = candle[2] if len(candle) > 2 else 0
+            close_price = candle[3] if len(candle) > 3 else 0
+            volume = candle[4] if len(candle) > 4 else 0
+            
+        # Normalize prices relative to the first H1 candle's close
+        if h1_data:
+            first_h1_close = h1_data[0].get('close', h1_data[0][3]) if isinstance(h1_data[0], dict) else h1_data[0][3]
+            norm_factor = first_h1_close if first_h1_close != 0 else 1
+        else:
+            norm_factor = 1
+            
+        features.extend([
+            open_price / norm_factor - 1,  # Normalized open
+            high_price / norm_factor - 1,  # Normalized high
+            low_price / norm_factor - 1,   # Normalized low
+            close_price / norm_factor - 1, # Normalized close
+            volume  # Volume (not normalized)
+        ])
+    
+    return np.array(features, dtype=np.float32)
+
+
 def generate_training_samples(data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
     """
     Wrapper function that takes a dataframe and saves it temporarily to call build_training_dataset
